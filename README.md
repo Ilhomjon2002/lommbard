@@ -1,0 +1,2 @@
+# lommbard
+lombard uchun bot
