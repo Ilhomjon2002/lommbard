@@ -8,8 +8,8 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 URL = f"https://api.telegram.org/bot{TOKEN}"
 
-# Xabarlarni bog'lash uchun dictionary
-user_messages = {}
+# Har bir mijoz uchun alohida chatni saqlash uchun dictionary
+user_chats = {}
 
 def get_updates(offset=None):
     """Telegram serveridan yangi xabarlarni olish"""
@@ -66,29 +66,34 @@ def bot_logic():
                         # Agar foydalanuvchi /start bosgan bo'lsa
                         if text == "/start":
                             send_welcome(chat_id)
+                            if chat_id not in user_chats:
+                                user_chats[chat_id] = {"last_msg_id": None}
 
                         # Agar foydalanuvchi yangi xabar yuborsa
                         elif chat_id != ADMIN_ID:
-                            # Adminni alohida user sifatida xabar yuborish
+                            # Har bir mijoz uchun alohida chat
+                            if chat_id not in user_chats:
+                                user_chats[chat_id] = {"last_msg_id": None}
                             sent_msg = requests.post(f"{URL}/sendMessage", data={
                                 "chat_id": ADMIN_ID,
                                 "text": f"👤 {user_first_name} (ID: {chat_id}):\n📝 {text}",
                                 "parse_mode": "HTML"
                             })
                             sent_msg_id = sent_msg.json().get("result", {}).get("message_id")
-                            
                             if sent_msg_id:
-                                user_messages[sent_msg_id] = chat_id  # Xabarni dictionary ga qo'shamiz
+                                user_chats[chat_id]["last_msg_id"] = sent_msg_id
 
                         # Agar admin reply qilib xabar yuborsa
                         elif chat_id == ADMIN_ID and "reply_to_message" in message:
                             reply_msg_id = message["reply_to_message"]["message_id"]
+                            reply_text = message["text"]
 
-                            if reply_msg_id in user_messages:
-                                user_id = user_messages[reply_msg_id]
-                                reply_text = message["text"]
-                                send_message(user_id, f"📩 {reply_text}")
-                                send_message(ADMIN_ID, "✅ Xabar foydalanuvchiga yuborildi!")
+                            # Tegishli mijozni topish
+                            for user_id, chat_data in user_chats.items():
+                                if chat_data["last_msg_id"] == reply_msg_id:
+                                    send_message(user_id, f"📩 {reply_text}")
+                                    send_message(ADMIN_ID, "✅ Xabar foydalanuvchiga yuborildi!")
+                                    break
                             else:
                                 send_message(ADMIN_ID, "⚠️ Bu xabarni foydalanuvchiga yuborib bo'lmaydi.")
 
