@@ -17,12 +17,28 @@ def get_updates(offset=None):
     response = requests.get(f"{URL}/getUpdates", params=params)
     return response.json()
 
-def send_message(chat_id, text, reply_to_message_id=None):
+def send_message(chat_id, text, reply_to_message_id=None, parse_mode=None):
     """Xabar yuborish"""
     data = {"chat_id": chat_id, "text": text}
     if reply_to_message_id:
         data["reply_to_message_id"] = reply_to_message_id
+    if parse_mode:
+        data["parse_mode"] = parse_mode
     requests.post(f"{URL}/sendMessage", data=data)
+
+def send_photo(chat_id, photo_url, caption=None):
+    """Rasm jo'natish"""
+    data = {"chat_id": chat_id, "photo": photo_url}
+    if caption:
+        data["caption"] = caption
+    requests.post(f"{URL}/sendPhoto", data=data)
+
+def send_document(chat_id, document_url, caption=None):
+    """Hujjat jo'natish"""
+    data = {"chat_id": chat_id, "document": document_url}
+    if caption:
+        data["caption"] = caption
+    requests.post(f"{URL}/sendDocument", data=data)
 
 def send_welcome(chat_id):
     """Mijoz /start bosganda unga xush kelibsiz xabarini yuborish"""
@@ -45,6 +61,7 @@ def bot_logic():
                         message = update["message"]
                         chat_id = message["chat"]["id"]
                         text = message.get("text", "")
+                        user_first_name = message.get("from", {}).get("first_name", "Anonim")
 
                         # Agar foydalanuvchi /start bosgan bo'lsa
                         if text == "/start":
@@ -52,7 +69,12 @@ def bot_logic():
 
                         # Agar foydalanuvchi yangi xabar yuborsa
                         elif chat_id != ADMIN_ID:
-                            sent_msg = requests.post(f"{URL}/sendMessage", data={"chat_id": ADMIN_ID, "text": f"👤 ID: {chat_id}\n📝 Xabar: {text}"})
+                            # Adminni alohida user sifatida xabar yuborish
+                            sent_msg = requests.post(f"{URL}/sendMessage", data={
+                                "chat_id": ADMIN_ID,
+                                "text": f"👤 {user_first_name} (ID: {chat_id}):\n📝 {text}",
+                                "parse_mode": "HTML"
+                            })
                             sent_msg_id = sent_msg.json().get("result", {}).get("message_id")
                             
                             if sent_msg_id:
@@ -64,7 +86,8 @@ def bot_logic():
 
                             if reply_msg_id in user_messages:
                                 user_id = user_messages[reply_msg_id]
-                                send_message(user_id, f"📩 Call-markaz: {text}")
+                                reply_text = message["text"]
+                                send_message(user_id, f"📩 {reply_text}")
                                 send_message(ADMIN_ID, "✅ Xabar foydalanuvchiga yuborildi!")
                             else:
                                 send_message(ADMIN_ID, "⚠️ Bu xabarni foydalanuvchiga yuborib bo'lmaydi.")
