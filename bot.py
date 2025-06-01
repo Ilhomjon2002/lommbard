@@ -32,14 +32,16 @@ def send_photo(chat_id, photo_url, caption=None):
     data = {"chat_id": chat_id, "photo": photo_url}
     if caption:
         data["caption"] = caption
-    requests.post(f"{URL}/sendPhoto", data=data)
+    response = requests.post(f"{URL}/sendPhoto", data=data)
+    return response.status_code == 200
 
 def send_document(chat_id, document_url, caption=None):
     """Hujjat jo'natish"""
     data = {"chat_id": chat_id, "document": document_url}
     if caption:
         data["caption"] = caption
-    requests.post(f"{URL}/sendDocument", data=data)
+    response = requests.post(f"{URL}/sendDocument", data=data)
+    return response.status_code == 200
 
 def send_welcome(chat_id):
     """Mijoz /start bosganda unga xush kelibsiz xabarini yuborish"""
@@ -60,14 +62,13 @@ def bot_logic():
                     if "message" in update:
                         message = update["message"]
                         chat_id = message["chat"]["id"]
-                        text = message.get("text", "")
+                        text = message.get("text", "").strip()
                         user_first_name = message.get("from", {}).get("first_name", "Anonim")
 
                         # Agar foydalanuvchi /start bosgan bo'lsa
                         if text == "/start" and chat_id != ADMIN_ID:
                             send_welcome(chat_id)
                             if chat_id not in user_chats:
-                                # Yangi mijoz uchun alohida chat
                                 initial_msg = f"👤 Yangi mijoz: {user_first_name} (ID: {chat_id})\n📝 Suhbat boshlandi!"
                                 chat_thread_id = send_message(ADMIN_ID, initial_msg, parse_mode="HTML")
                                 if chat_thread_id:
@@ -85,8 +86,28 @@ def bot_logic():
 
                             for user_id, chat_thread_id in user_chats.items():
                                 if chat_thread_id == reply_msg_id:
-                                    send_message(user_id, f"📩 {reply_text}")
-                                    send_message(ADMIN_ID, "✅ Xabar foydalanuvchiga yuborildi!", reply_to_message_id=reply_msg_id)
+                                    # Rasm yoki hujjatni aniqlash
+                                    if reply_text.lower().startswith("photo"):
+                                        parts = reply_text.split(maxsplit=2)
+                                        if len(parts) >= 2:
+                                            photo_url = parts[1]
+                                            caption = parts[2] if len(parts) > 2 else None
+                                            if send_photo(user_id, photo_url, caption):
+                                                send_message(ADMIN_ID, "✅ Rasm yuborildi!", reply_to_message_id=reply_msg_id)
+                                            else:
+                                                send_message(ADMIN_ID, "⚠️ Rasm yuborishda xatolik!", reply_to_message_id=reply_msg_id)
+                                    elif reply_text.lower().startswith("doc"):
+                                        parts = reply_text.split(maxsplit=2)
+                                        if len(parts) >= 2:
+                                            doc_url = parts[1]
+                                            caption = parts[2] if len(parts) > 2 else None
+                                            if send_document(user_id, doc_url, caption):
+                                                send_message(ADMIN_ID, "✅ Hujjat yuborildi!", reply_to_message_id=reply_msg_id)
+                                            else:
+                                                send_message(ADMIN_ID, "⚠️ Hujjat yuborishda xatolik!", reply_to_message_id=reply_msg_id)
+                                    else:
+                                        send_message(user_id, f"📩 {reply_text}")
+                                        send_message(ADMIN_ID, "✅ Xabar yuborildi!", reply_to_message_id=reply_msg_id)
                                     break
                             else:
                                 send_message(ADMIN_ID, "⚠️ Bu xabarni foydalanuvchiga yuborib bo'lmaydi.", reply_to_message_id=reply_msg_id)
