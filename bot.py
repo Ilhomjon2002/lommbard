@@ -9,7 +9,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 URL = f"https://api.telegram.org/bot{TOKEN}"
 
 # Har bir mijoz uchun alohida chatni saqlash uchun dictionary
-user_chats = {}  # {user_id: {"chat_id": admin_chat_id, "messages": []}}
+user_chats = {}  # {user_id: chat_thread_id}
 
 def get_updates(offset=None):
     """Telegram serveridan yangi xabarlarni olish"""
@@ -67,27 +67,24 @@ def bot_logic():
                         if text == "/start" and chat_id != ADMIN_ID:
                             send_welcome(chat_id)
                             if chat_id not in user_chats:
-                                # Yangi chat uchun alohida xabar adminiga
+                                # Yangi mijoz uchun alohida chat
                                 initial_msg = f"👤 Yangi mijoz: {user_first_name} (ID: {chat_id})\n📝 Suhbat boshlandi!"
-                                msg_id = send_message(ADMIN_ID, initial_msg, parse_mode="HTML")
-                                if msg_id:
-                                    user_chats[chat_id] = {"chat_id": msg_id, "messages": []}
+                                chat_thread_id = send_message(ADMIN_ID, initial_msg, parse_mode="HTML")
+                                if chat_thread_id:
+                                    user_chats[chat_id] = chat_thread_id
 
                         # Agar foydalanuvchi yangi xabar yuborsa
                         elif chat_id != ADMIN_ID and chat_id in user_chats:
-                            user_chat_id = user_chats[chat_id]["chat_id"]
                             new_msg = f"👤 {user_first_name} (ID: {chat_id}):\n📝 {text}"
-                            msg_id = send_message(ADMIN_ID, new_msg, parse_mode="HTML", reply_to_message_id=user_chat_id)
-                            if msg_id:
-                                user_chats[chat_id]["messages"].append({"msg_id": msg_id, "text": text})
+                            send_message(ADMIN_ID, new_msg, reply_to_message_id=user_chats[chat_id], parse_mode="HTML")
 
                         # Agar admin reply qilib xabar yuborsa
                         elif chat_id == ADMIN_ID and "reply_to_message" in message:
                             reply_msg_id = message["reply_to_message"]["message_id"]
                             reply_text = message["text"]
 
-                            for user_id, chat_data in user_chats.items():
-                                if chat_data["chat_id"] == reply_msg_id or reply_msg_id in [msg["msg_id"] for msg in chat_data["messages"]]:
+                            for user_id, chat_thread_id in user_chats.items():
+                                if chat_thread_id == reply_msg_id:
                                     send_message(user_id, f"📩 {reply_text}")
                                     send_message(ADMIN_ID, "✅ Xabar foydalanuvchiga yuborildi!", reply_to_message_id=reply_msg_id)
                                     break
