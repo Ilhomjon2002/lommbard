@@ -9,7 +9,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 URL = f"https://api.telegram.org/bot{TOKEN}"
 
 # Har bir mijoz uchun alohida chatni saqlash uchun dictionary
-user_chats = {}  # {user_id: chat_thread_id}
+user_chats = {}  # {user_id: last_message_id}
 
 def get_updates(offset=None):
     """Telegram serveridan yangi xabarlarni olish"""
@@ -77,15 +77,18 @@ def bot_logic():
                         # Agar foydalanuvchi yangi xabar yuborsa
                         elif chat_id != ADMIN_ID and chat_id in user_chats:
                             new_msg = f"👤 {user_first_name} (ID: {chat_id}):\n📝 {text}"
-                            send_message(ADMIN_ID, new_msg, reply_to_message_id=user_chats[chat_id], parse_mode="HTML")
+                            # Har bir yangi xabar uchun message_id'ni yangilash
+                            new_msg_id = send_message(ADMIN_ID, new_msg, reply_to_message_id=user_chats[chat_id], parse_mode="HTML")
+                            if new_msg_id:
+                                user_chats[chat_id] = new_msg_id  # Yangi message_id'ni saqlash
 
                         # Agar admin reply qilib xabar yuborsa
                         elif chat_id == ADMIN_ID and "reply_to_message" in message:
                             reply_msg_id = message["reply_to_message"]["message_id"]
                             reply_text = message["text"]
 
-                            for user_id, chat_thread_id in user_chats.items():
-                                if chat_thread_id == reply_msg_id:
+                            for user_id, last_msg_id in user_chats.items():
+                                if last_msg_id == reply_msg_id:
                                     # Rasm yoki hujjatni aniqlash
                                     if reply_text.lower().startswith("photo"):
                                         parts = reply_text.split(maxsplit=2)
